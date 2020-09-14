@@ -85,9 +85,8 @@ If you run the follow command to evaluate the model for `./weights/task1/novel_2
 $ python test_RFB_target.py --trained_model ./weights/task1/novel_2shot_05kd_seed0_2dist_div8_new/Final_RFB_vgg_VOC.pth
 ```
 
-you would likely get
+you would likely get the corresponding results
 
-The corresponding results are listed below
 <table>
   <tr>
     <th>Novel mAP</th><th>Base mAP</th><th>Overall mAP</th>
