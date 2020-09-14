@@ -887,12 +887,16 @@ def detection_collate(batch):
     """
     targets = []
     imgs = []
+    imgs_bms = []
     for _, sample in enumerate(batch):
         for _, tup in enumerate(sample):
             if torch.is_tensor(tup):
-                imgs.append(tup)
+                if tup.shape[0] == 3:
+                    imgs.append(tup)
+                if tup.shape[0] == 1:
+                    imgs_bms.append(tup)
             elif isinstance(tup, type(np.empty(0))):
                 annos = torch.from_numpy(tup).float()
                 targets.append(annos)
 
-    return (torch.stack(imgs, 0), targets)
+    return (torch.stack(imgs, 0), targets, torch.stack(imgs_bms, 0))
