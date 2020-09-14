@@ -8,7 +8,7 @@ from utils.nms_wrapper import nms
 import numpy as np
 
 
-class Detect_tf_soft_source_cls(Function):
+class Detect_tf_soft_cls(Function):
     """At test time, Detect is the final layer of SSD.  Decode location preds,
     apply non-maximum suppression to location predictions based on conf
     scores and threshold to a top_k number of output predictions for both
@@ -71,12 +71,12 @@ class Detect_tf_soft_source_cls(Function):
             bin_scores = bin_conf_preds[i].clone()
 
             soft_conf_scores = torch.zeros(self.num_priors, self.num_classes)
-            soft_conf_scores[:, 1:] = (conf_scores[:, 1:].t() * bin_scores[:, 1]).t()
-            soft_conf_scores[:, 0] = bin_scores[:, 0] + conf_scores[:, 0] * bin_scores[:, 0]
+            soft_conf_scores[:, 1:] = (conf_scores[:, ].t() * bin_scores[:, 1]).t()
+            soft_conf_scores[:, 0] = bin_scores[:, 0]
 
             self.boxes[i] = decoded_boxes
-            #self.scores[i] = soft_conf_scores
-            self.scores[i] = conf_scores
+            self.scores[i] = soft_conf_scores
+            #self.scores[i] = conf_scores
             #self.scores[i] = bin_scores
 
         return self.boxes, self.scores

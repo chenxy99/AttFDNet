@@ -26,6 +26,21 @@ import random
 import collections
 
 '''
+VOC_CLASSES = ( '__background__', # always index 0
+    'frontground')
+
+
+
+VOC_CLASSES = ( '__background__', # always index 0
+    'aeroplane', 'bicycle', 'bird', 'boat',
+    'bottle', 'bus', 'car', 'cat', 'chair',
+    'cow', 'diningtable', 'dog', 'horse',
+    'motorbike', 'person', 'pottedplant',
+    'sheep', 'sofa', 'train', 'tvmonitor')
+'''
+
+
+'''
 # for data split 1
 VOC_CLASSES = ( '__background__',
     'aeroplane', 'bicycle', 'boat', 'bottle',
@@ -53,14 +68,14 @@ VOC_CLASSES = ( '__background__', # always index 0
     'dog', 'motorbike', 'person', 'pottedplant',
     'sheep', 'train', 'tvmonitor', 'aeroplane',
     'bottle', 'cow', 'horse', 'sofa')
-    
+
 # for data split 3
 VOC_CLASSES = ( '__background__', # always index 0
     'aeroplane', 'bicycle', 'bird', 'bottle',
     'bus', 'car', 'chair', 'cow',
     'diningtable', 'dog', 'horse', 'person',
     'pottedplant', 'train', 'tvmonitor')
-    
+
 VOC_CLASSES = ( '__background__', # always index 0
     'aeroplane', 'bicycle', 'bird', 'bottle',
     'bus', 'car', 'chair', 'cow',
@@ -68,13 +83,13 @@ VOC_CLASSES = ( '__background__', # always index 0
     'pottedplant', 'train', 'tvmonitor', 'boat',
     'cat', 'motorbike', 'sheep', 'sofa')
 '''
-# for data split 2
-VOC_CLASSES = ('__background__',  # always index 0
-               'bicycle', 'bird', 'boat', 'bus',
-               'car', 'cat', 'chair', 'diningtable',
-               'dog', 'motorbike', 'person', 'pottedplant',
-               'sheep', 'train', 'tvmonitor', 'aeroplane',
-               'bottle', 'cow', 'horse', 'sofa')
+# for data split 1
+VOC_CLASSES = ( '__background__',
+    'aeroplane', 'bicycle', 'boat', 'bottle',
+    'car', 'cat', 'chair', 'diningtable',
+    'dog', 'horse', 'person', 'pottedplant',
+    'sheep', 'train', 'tvmonitor', 'bird',
+    'bus', 'cow', 'motorbike', 'sofa')
 
 # for making bounding boxes pretty
 COLORS = ((255, 0, 0, 128), (0, 255, 0, 128), (0, 0, 255, 128),
@@ -203,7 +218,7 @@ class VOCDetection(data.Dataset):
     """
 
     def __init__(self, root, image_sets, preproc=None, target_transform=None,
-                 dataset_name='VOC0712'):
+                 dataset_name='VOC0712', bms_div=8):
         self.root = root
         self.image_set = image_sets
         self.preproc = preproc
@@ -217,6 +232,7 @@ class VOCDetection(data.Dataset):
             rootpath = os.path.join(self.root, 'VOC' + year)
             for line in open(os.path.join(rootpath, 'ImageSets', 'Main', name + '.txt')):
                 self.ids.append((rootpath, line.strip()))
+        self.bms_div = bms_div
 
     def __getitem__(self, index):
         img_id = self.ids[index]
@@ -232,7 +248,7 @@ class VOCDetection(data.Dataset):
 
         brg_img = torch.tensor([123.0, 117.0, 104.0]).unsqueeze(1).unsqueeze(2) + img
 
-        bms_img = torch.tensor(np.expand_dims(compute_saliency(np.transpose(brg_img.cpu(), (1,2,0))), axis=0).astype(np.float32) / 8)
+        bms_img = torch.tensor(np.expand_dims(compute_saliency(np.transpose(brg_img.cpu(), (1,2,0))), axis=0).astype(np.float32) / self.bms_div)
 
         return img, target, bms_img
 
@@ -507,7 +523,7 @@ class VOCDetection_fewshot_new(data.Dataset):
     """
 
     def __init__(self, root, image_sets, preproc=None, target_transform=None,
-                 dataset_name='VOC0712'):
+                 dataset_name='VOC0712', split='split1', shots=1, bms_div=8):
         self.root = root
         self.image_set = image_sets
         self.preproc = preproc
@@ -524,9 +540,18 @@ class VOCDetection_fewshot_new(data.Dataset):
 
         self.metaclass = VOC_CLASSES
         self.base_novel_ratio = 3
-        self.shots = 1
-        random.seed(0)
+        self.shots = shots
+        if split == 'split1':
+            random.seed(0)
+        elif split == 'split2':
+            random.seed(0)
+        elif split == 'split3':
+            random.seed(3)
+        else:
+            random.seed(3)
+        self.bms_div = bms_div
         self.get_fsdata()
+
 
     def get_fsdata(self):
         '''
@@ -601,26 +626,19 @@ class VOCDetection_fewshot_new(data.Dataset):
 
         target_index = self.target_index[img_id]
         target = np.expand_dims(target[target_index, :], axis=0)
-        #image_index = img_id[1]
-        # cls = self.record[image_index]
-        # select_index = np.where(target[:, 4] == cls)
 
-
-        #if np.sum((target[:, 4] == cls)) >= 2:
-        #    a =1
-        # target = np.take(target, select_index[0], axis=0)
-
-        #target = np.expand_dims(target[0], 0)
-        #row = target.shape[0]
-        #target[1:row, 4] = -1.
 
         if self.preproc is not None:
             img, target = self.preproc(img, target)
 
+
         brg_img = torch.tensor([123.0, 117.0, 104.0]).unsqueeze(1).unsqueeze(2) + img
 
+        # bms_img = torch.tensor(
+        #     np.expand_dims(compute_saliency(np.transpose(brg_img.cpu(), (1, 2, 0))), axis=0).astype(np.float32) / 8)
+
         bms_img = torch.tensor(
-            np.expand_dims(compute_saliency(np.transpose(brg_img.cpu(), (1, 2, 0))), axis=0).astype(np.float32) / 4)
+            np.expand_dims(compute_saliency(np.transpose(brg_img.cpu(), (1, 2, 0))), axis=0).astype(np.float32) / self.bms_div)
 
         return img, target, bms_img
 
@@ -875,15 +893,20 @@ class VOCDetection_fewshot_new(data.Dataset):
         print('-- Thanks, The Management')
         print('--------------------------------------------------------------')
 
+
+
 def detection_collate(batch):
     """Custom collate fn for dealing with batches of images that have a different
     number of associated object annotations (bounding boxes).
+
     Arguments:
         batch: (tuple) A tuple of tensor images and lists of annotations
+
     Return:
         A tuple containing:
             1) (tensor) batch of images stacked on their 0 dim
             2) (list of tensors) annotations for a given image are stacked on 0 dim
+            3) (tensor) batch of images stacked on their 0 dim
     """
     targets = []
     imgs = []

@@ -14,7 +14,7 @@ from data import VOCroot,COCOroot
 from data import AnnotationTransform, COCODetection, VOCDetection, BaseTransform, VOC_300,VOC_512,COCO_300,COCO_512, COCO_mobile_300
 
 import torch.utils.data as data
-from layers.functions import PriorBox, Detect_tf_soft_source_cls
+from layers.functions import Detect, PriorBox, Detect_tf, Detect_tf_soft, Detect_tf_soft_source_cls
 from utils.nms_wrapper import nms
 from utils.timer import Timer
 
@@ -30,7 +30,7 @@ parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
 parser.add_argument('-d', '--dataset', default='VOC',
                     help='VOC or COCO version')
-parser.add_argument('-m', '--trained_model', default='weights/task3/source_300_0712_320embedding_20200202/RFB_vgg_VOC_epoches_30.pth',
+parser.add_argument('-m', '--trained_model', default='weights/task1/source_300_0712_320embedding_20200227/Final_RFB_vgg_VOC.pth',
                     type=str, help='Trained state_dict file path to open')
 parser.add_argument('--save_folder', default='eval/', type=str,
                     help='Dir to save results')
@@ -40,8 +40,10 @@ parser.add_argument('--cpu', default=False, type=bool,
                     help='Use cpu nms')
 parser.add_argument('--retest', default=False, type=bool,
                     help='test cache results')
-parser.add_argument('--resume_SAM', default='./weights/saliency/model_best.pth',
-                    help='resume SAM models')
+parser.add_argument('--bms_div', default='8', type=float,
+                    help='the hyperparameter for the bms result')
+parser.add_argument('--split', default='split1', type=str,
+                    help='e.g, split1, split2, split3')
 args = parser.parse_args()
 
 if not os.path.exists(args.save_folder):
@@ -69,6 +71,21 @@ with torch.no_grad():
     priors = priorbox.forward()
     if args.cuda:
         priors = priors.cuda()
+
+
+def vis_picture(im):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    npimg = im.cpu().numpy()
+    npimg = np.squeeze(npimg, 0)
+    im = np.transpose(npimg, (1, 2, 0))
+
+    im = (im + np.array([104, 117, 123])) / 255
+    im = im[:, :, ::-1]
+
+    plt.cla()
+    plt.imshow(im)
+    plt.show()
 
 
 def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image=300, thresh=0.005):
@@ -104,9 +121,10 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
             index = [2, 1, 0]
             SAM_images = SAM_images[:, index, :, :]  # bgr to rgb
             VGG_means = torch.tensor([123.0, 117.0, 104.0]).unsqueeze(1).unsqueeze(2)
+
             SAM_images = SAM_images + VGG_means
 
-            sal_img = torch.tensor(compute_saliency(SAM_images.squeeze(0).permute(1,2,0).cpu()).astype(np.float32)) / 8
+            sal_img = torch.tensor(compute_saliency(SAM_images.squeeze(0).permute(1,2,0).cpu()).astype(np.float32)) / args.bms_div
 
             if cuda:
                 x = x.cuda()
@@ -115,9 +133,11 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
 
 
         _t['im_detect'].tic()
+
         feed_conv_4_3 = F.interpolate(sal_img.unsqueeze(0).unsqueeze(0), (38, 38))
 
         out = net(x, feed_conv_4_3)      # forward pass
+        # boxes, scores = detector.forward(out,priors)
         boxes, scores = detector.forward(out, priors, scale)
         detect_time = _t['im_detect'].toc()
         boxes = boxes[0]
@@ -192,11 +212,22 @@ if __name__ == '__main__':
 
     # load data
     if args.dataset == 'VOC':
-        testset = VOCDetection(
-            VOCroot, [('2007-Task2-base', 'test')], None, AnnotationTransform())
+        if args.split == "split1":
+            testset = VOCDetection(
+                VOCroot, [('2007-Task1-base', 'test')], None, AnnotationTransform())
+        elif args.split == "split2":
+            testset = VOCDetection(
+                VOCroot, [('2007-Task2-base', 'test')], None, AnnotationTransform())
+        elif args.split == "split3":
+            testset = VOCDetection(
+                VOCroot, [('2007-Task3-base', 'test')], None, AnnotationTransform())
+        else:
+            testset = VOCDetection(
+                VOCroot, [('2007-Task3-base', 'test')], None, AnnotationTransform())
 
     elif args.dataset == 'COCO':
         testset = COCODetection(
+        #COCOroot, [('2017', 'val')], None)
             COCOroot, [('2015', 'test-dev')], None)
     else:
         print('Only VOC and COCO dataset are supported now!')

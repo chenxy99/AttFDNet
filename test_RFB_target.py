@@ -14,16 +14,14 @@ from data import VOCroot,COCOroot
 from data import AnnotationTransform, COCODetection, VOCDetection, BaseTransform, VOC_300,VOC_512,COCO_300,COCO_512, COCO_mobile_300
 
 import torch.utils.data as data
-from layers.functions import PriorBox, Detect_tf_soft_source_cls
+from layers.functions import Detect, PriorBox, Detect_tf, Detect_tf_soft, Detect_tf_soft_cls, Detect_tf_soft_source_cls
 from utils.nms_wrapper import nms
 from utils.timer import Timer
 
-from saliency_models.sam import SAM
 from saliency_models.bms import compute_saliency
 
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-#torch.cuda.set_device(0)
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 parser = argparse.ArgumentParser(description='Receptive Field Block Net')
 
@@ -33,9 +31,8 @@ parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
 parser.add_argument('-d', '--dataset', default='VOC',
                     help='VOC or COCO version')
-parser.add_argument('-m', '--trained_model', default='weights/task1/novel_1shot_05kd_seed0_2dist_div4_new/RFB_vgg_VOC_epoches_500.pth',
+parser.add_argument('-m', '--trained_model', default='weights/task1/novel_2shot_05kd_seed0_2dist_div8_new/Final_RFB_vgg_VOC.pth',
                     type=str, help='Trained state_dict file path to open')
-#RFB_vgg_VOC_epoches_300.pth Final_RFB_vgg_VOC.pth novel_5shot_05kd_seed0_2dist_new_bilinear Final_RFB_vgg_VOC.pth
 parser.add_argument('--save_folder', default='eval/', type=str,
                     help='Dir to save results')
 parser.add_argument('--cuda', default=True, type=bool,
@@ -44,8 +41,8 @@ parser.add_argument('--cpu', default=False, type=bool,
                     help='Use cpu nms')
 parser.add_argument('--retest', default=False, type=bool,
                     help='test cache results')
-parser.add_argument('--resume_SAM', default='./weights/saliency/model_best.pth',
-                    help='resume SAM models')
+parser.add_argument('--bms_div', default='8', type=float,
+                    help='the hyperparameter for the bms result')
 args = parser.parse_args()
 
 if not os.path.exists(args.save_folder):
@@ -127,7 +124,7 @@ def test_net(save_folder, net, detector, detector_target, cuda, testset, transfo
             SAM_images = SAM_images + VGG_means
 
             sal_img = torch.tensor(
-                compute_saliency(SAM_images.squeeze(0).permute(1, 2, 0).cpu()).astype(np.float32)) / 8
+                compute_saliency(SAM_images.squeeze(0).permute(1, 2, 0).cpu()).astype(np.float32)) / args.bms_div
 
             if cuda:
                 x = x.cuda()
@@ -152,6 +149,7 @@ def test_net(save_folder, net, detector, detector_target, cuda, testset, transfo
         boxes *= scale
         boxes = boxes.cpu().numpy()
         scores = scores.cpu().numpy()
+
 
         boxes_target, scores = detector_target.forward(out1, priors, scale)
         detect_time = _t['im_detect'].toc()
@@ -250,14 +248,6 @@ if __name__ == '__main__':
     print('Finished loading model!')
     print(net)
 
-    # load SAM net
-    saliency_model = SAM()
-    saliency_model.load_state_dict(torch.load(args.resume_SAM))
-    saliency_model.eval()
-    for params in saliency_model.parameters():
-        params.requires_grad = False
-    print('Finished loading SAM network...')
-
     # load data
     if args.dataset == 'VOC':
         testset = VOCDetection(
@@ -270,11 +260,9 @@ if __name__ == '__main__':
         print('Only VOC and COCO dataset are supported now!')
     if args.cuda:
         net = net.cuda()
-        saliency_model = saliency_model.cuda()
         cudnn.benchmark = True
     else:
         net = net.cpu()
-        saliency_model = saliency_model.cpu()
     # evaluation
     #top_k = (300, 200)[args.dataset == 'COCO']
     top_k = 300

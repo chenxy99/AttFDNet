@@ -8,7 +8,7 @@ from utils.nms_wrapper import nms
 import numpy as np
 
 
-class Detect_tf_soft_source_cls(Function):
+class Detect_tf_soft(Function):
     """At test time, Detect is the final layer of SSD.  Decode location preds,
     apply non-maximum suppression to location predictions based on conf
     scores and threshold to a top_k number of output predictions for both
@@ -43,8 +43,8 @@ class Detect_tf_soft_source_cls(Function):
         self.num_priors = prior_data.size(0)
         self.boxes = torch.zeros(1, self.num_priors, 4)
         self.bin_scores = torch.zeros(1, self.num_priors, 2)
-        self.scores = torch.zeros(1, self.num_priors, self.num_classes)
-
+      #  self.scores = torch.zeros(1, self.num_priors, self.num_classes)
+        self.scores = torch.zeros(1, self.num_priors, 2)
         if loc_data.is_cuda:
             self.boxes = self.boxes.cuda()
             self.bin_scores = self.bin_scores.cuda()
@@ -69,14 +69,14 @@ class Detect_tf_soft_source_cls(Function):
             decoded_boxes = decode(loc_data[i], prior_data, self.variance)
             conf_scores = conf_preds[i].clone()
             bin_scores = bin_conf_preds[i].clone()
-
+            '''
             soft_conf_scores = torch.zeros(self.num_priors, self.num_classes)
-            soft_conf_scores[:, 1:] = (conf_scores[:, 1:].t() * bin_scores[:, 1]).t()
-            soft_conf_scores[:, 0] = bin_scores[:, 0] + conf_scores[:, 0] * bin_scores[:, 0]
-
+            soft_conf_scores[:, 1:] = (conf_scores[:, ].t() * bin_scores[:, 1]).t()
+            soft_conf_scores[:, 0] =  bin_scores[:, 0]
+            '''
             self.boxes[i] = decoded_boxes
             #self.scores[i] = soft_conf_scores
-            self.scores[i] = conf_scores
-            #self.scores[i] = bin_scores
+            #self.scores[i] = conf_scores
+            self.scores[i] = bin_scores
 
         return self.boxes, self.scores

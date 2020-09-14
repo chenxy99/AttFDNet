@@ -13,10 +13,11 @@ from torch.autograd import Variable
 import torch.utils.data as data
 from data import VOCroot, COCOroot, VOC_300, VOC_512, COCO_300, COCO_512, COCO_mobile_300, AnnotationTransform, \
     COCODetection, VOCDetection, VOCDetection_fewshot_new, detection_collate, BaseTransform, preproc, preproc_tf
-from layers.modules import KD_loss, search_imprinted_weights, MultiBoxLoss_tf_target
+from layers.modules import MultiBoxLoss_tf_source,  KD_loss, search_imprinted_weights, MultiBoxLoss_tf_target
 from layers.functions import PriorBox
 import time
 import torch.nn.functional as F
+
 
 parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
@@ -53,12 +54,15 @@ parser.add_argument('--gamma', default=0.1,
                     type=float, help='Gamma update for SGD')
 parser.add_argument('--log_iters', default=True,
                     type=bool, help='Print the loss at each iteration')
-parser.add_argument('--save_folder', default='./weights/task1/novel_1shot_05kd_seed0_2dist_div4_new/',
+parser.add_argument('--save_folder', default='./weights/task1/novel_3shot_05kd_seed0_2dist_div8_new/',
                     help='Location to save checkpoint models')
+parser.add_argument('--split', default='split1', type=str,
+                    help='e.g, split1, split2, split3')
+parser.add_argument('--shots', default='3', type=int,
+                    help='e.g, 1, 2, 3')
+parser.add_argument('--bms_div', default='8', type=float,
+                    help='the hyperparameter for the bms result')
 
-# novel_1shot_05kd_seed1_2dist
-parser.add_argument('--resume_SAM', default='./weights/saliency/model_best.pth',
-                    help='resume SAM models')
 args = parser.parse_args()
 
 if not os.path.exists(args.save_folder):
@@ -75,7 +79,7 @@ else:
 
 # set the seed
 torch.manual_seed(0)
-np.random.seed(3)
+np.random.seed(0)
 
 
 if args.version == 'RFB_vgg':
@@ -149,6 +153,7 @@ else:
     # load resume network
     print('Loading resume network...')
 
+    #args.resume_net = 'weights/task3-source/RFB_vgg_VOC_epoches_295.pth'
     state_dict = torch.load(args.resume_net)
     # create new OrderedDict that does not contain `module.`
     from collections import OrderedDict
@@ -174,6 +179,7 @@ for pars_val in net.parameters():
 
 if args.ngpu > 1:
     net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
+    # net = torch.nn.DataParallel(net)
 
 if args.cuda:
     net.cuda()
@@ -215,8 +221,6 @@ if args.resume_net == None:
 else:
     # load resume network
     print('Loading resume network...')
-
-    #args.resume_net = 'weights/task3-target1/kd_ls/RFB_vgg_VOC_epoches_395.pth'
 
     state_dict = torch.load(args.resume_net)
     # create new OrderedDict that does not contain `module.`
@@ -261,6 +265,8 @@ if args.cuda:
 
 optimizer = optim.SGD(net_target1.parameters(), lr=args.lr,
                       momentum=args.momentum, weight_decay=args.weight_decay)
+# optimizer = optim.RMSprop(net.parameters(), lr=args.lr,alpha = 0.9, eps=1e-08,
+#                      momentum=args.momentum, weight_decay=args.weight_decay)
 
 S_imprinted_weights = search_imprinted_weights(num_classes, 0.85, True, 0, True, 00, 0.5, False)
 target_criterion = MultiBoxLoss_tf_target(num_classes+num_classes_target1, 0.5, True, 0, True, 3, 0.5, False)
@@ -286,16 +292,16 @@ def train():
     print('Loading Dataset...')
 
     if args.dataset == 'VOC':
+        #dataset = VOCDetection(VOCroot, train_sets, preproc(
+        #    img_dim, rgb_means, p), AnnotationTransform())
         dataset = VOCDetection_fewshot_new(VOCroot, train_sets, preproc(
-            img_dim, rgb_means, p), AnnotationTransform())
+            img_dim, rgb_means, p), AnnotationTransform(), split=args.split, shots=args.shots, bms_div = args.bms_div)
     elif args.dataset == 'COCO':
         dataset = COCODetection(COCOroot, train_sets, preproc(
             img_dim, rgb_means, p))
     else:
         print('Only VOC and COCO are supported now!')
         return
-
-    # low shot tramsform
 
     epoch_size = len(dataset) // args.batch_size
     max_iter = args.max_epoch * epoch_size
@@ -320,7 +326,7 @@ def train():
                                                   collate_fn=detection_collate))
             loc_loss = 0
             conf_loss = 0
-            if (epoch % 100 == 0 and epoch > 0):# or (epoch % 10 == 0 and epoch > 200):
+            if (epoch % 100 == 0 and epoch > 0):
                 torch.save(net_target1.state_dict(), args.save_folder + args.version + '_' + args.dataset + '_epoches_' +
                            repr(epoch) + '.pth')
             epoch += 1
@@ -342,7 +348,6 @@ def train():
             images = Variable(images)
             targets = [Variable(anno) for anno in targets]
             bms_images = Variable(bms_images)
-
 
         feed_conv_4_3 = F.interpolate(bms_images, (38, 38))
 
@@ -381,7 +386,6 @@ def train():
                   + '|| Totel iter ' +
                   repr(iteration) + ' || L: %.4f C: %.4f  B: %.4f kd_L: %.4f kd: %.4f dist: %4f||' % (
                       loss_l.item(), loss_c.item(), loss_bin.item(), kd_loss_l.item(), kd_loss_c.item(), dist_loss.item()) +
-                      #loss_l.item(), loss_c.item(), loss_bin.item()) +
                   'Batch time: %.4f sec. ||' % (load_t1 - load_t0) + 'LR: %.8f' % (lr))
     torch.save(net_target1.state_dict(), args.save_folder +
                'Final_' + args.version + '_' + args.dataset + '.pth')
@@ -396,7 +400,7 @@ def train_imprint():
 
     if args.dataset == 'VOC':
         dataset = VOCDetection_fewshot_new(VOCroot, train_sets, preproc(
-            img_dim, rgb_means, p), AnnotationTransform())
+            img_dim, rgb_means, p), AnnotationTransform(), split=args.split, shots=args.shots, bms_div = args.bms_div)
     elif args.dataset == 'COCO':
         dataset = COCODetection(COCOroot, train_sets, preproc(
             img_dim, rgb_means, p))
@@ -404,7 +408,7 @@ def train_imprint():
         print('Only VOC and COCO are supported now!')
         return
 
-    # low shot tramsform
+
     low_batch = low_shots_num
     epoch_size = len(dataset) // low_batch
     start_iter = 0
@@ -430,6 +434,7 @@ def train_imprint():
                 images = Variable(images)
                 targets = [Variable(anno) for anno in targets]
                 bms_images = Variable(bms_images)
+
 
             feed_conv_4_3 = F.interpolate(bms_images, (38, 38))
 
@@ -463,6 +468,8 @@ def train_imprint():
         net_target1.module.classifier_target1.fc.weight.data = new_weight
     else:
         net_target1.classifier_target1.fc.weight.data = new_weight
+
+
 
 
 def adjust_learning_rate(optimizer, gamma, epoch, step_index, iteration, epoch_size):

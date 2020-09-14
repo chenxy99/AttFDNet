@@ -13,11 +13,10 @@ from torch.autograd import Variable
 import torch.utils.data as data
 from data import VOCroot, COCOroot, VOC_300, VOC_512, COCO_300, COCO_512, COCO_mobile_300, AnnotationTransform, \
     COCODetection, VOCDetection, detection_collate, BaseTransform, preproc, preproc_tf
-from layers.modules import MultiBoxLoss, MultiBoxLoss_tf_source, MultiBoxLoss_tf_source_combine
+from layers.modules import MultiBoxLoss_tf_source
 from layers.functions import PriorBox
 import time
 import torch.nn.functional as F
-
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
@@ -44,8 +43,8 @@ parser.add_argument('--lr', '--learning-rate',
                     default=4e-4, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument(
-    '--resume_net', default='./weights/task1/source_300_0712_320embedding_20200227/RFB_vgg_VOC_epoches_20.pth', help='resume net for retraining')
-parser.add_argument('--resume_epoch', default=20,
+    '--resume_net', default=None, help='resume net for retraining')
+parser.add_argument('--resume_epoch', default=0,
                     type=int, help='resume iter for retraining')
 parser.add_argument('-max', '--max_epoch', default=150,
                     type=int, help='max epoch for retraining')
@@ -57,8 +56,10 @@ parser.add_argument('--log_iters', default=True,
                     type=bool, help='Print the loss at each iteration')
 parser.add_argument('--save_folder', default='./weights/task1/source_300_0712_320embedding_20200227/',
                     help='Location to save checkpoint models')
-parser.add_argument('--resume_SAM', default='./weights/saliency/model_best.pth',
-                    help='resume SAM models')
+parser.add_argument('--bms_div', default='8', type=float,
+                    help='the hyperparameter for the bms result')
+parser.add_argument('--split', default='split1', type=str,
+                    help='e.g, split1, split2, split3')
 args = parser.parse_args()
 
 # set the seed
@@ -70,15 +71,20 @@ if not os.path.exists(args.save_folder):
     os.mkdir(args.save_folder)
 
 if args.dataset == 'VOC':
-    train_sets = [('2007-Task1-base', 'trainval'), ('2012-Task1-base', 'trainval')]
+    if args.split == "split1":
+        train_sets = [('2007-Task1-base', 'trainval'), ('2012-Task1-base', 'trainval')]
+    elif args.split == "split2":
+        train_sets = [('2007-Task2-base', 'trainval'), ('2012-Task2-base', 'trainval')]
+    elif args.split == "split3":
+        train_sets = [('2007-Task3-base', 'trainval'), ('2012-Task3-base', 'trainval')]
+    else:
+        train_sets = [('2007-Task1-base', 'trainval'), ('2012-Task1-base', 'trainval')]
     cfg = (VOC_300, VOC_512)[args.size == '512']
 else:
     # train_sets = [('2014', 'train'),('2014', 'valminusminival')]
     train_sets = [('2017', 'train')]
     # train_sets = [('2014', 'valminusminival')]
     cfg = (COCO_300, COCO_512)[args.size == '512']
-
-#cfg = VOC_300
 
 if args.version == 'RFB_vgg':
     from models.RFB_Net_vgg import build_net
@@ -178,6 +184,12 @@ with torch.no_grad():
         priors = priors.cuda()
 
 
+def show_tensor(imgs):
+    import matplotlib.pyplot as plt
+    imgs = imgs.cpu()
+    plt.imshow(imgs)
+    plt.show()
+
 def train():
     net.train()
     # loss counters
@@ -188,14 +200,13 @@ def train():
 
     if args.dataset == 'VOC':
         dataset = VOCDetection(VOCroot, train_sets, preproc(
-            img_dim, rgb_means, p), AnnotationTransform())
+            img_dim, rgb_means, p), AnnotationTransform(), bms_div=args.bms_div)
     elif args.dataset == 'COCO':
         dataset = COCODetection(COCOroot, train_sets, preproc(
             img_dim, rgb_means, p))
     else:
         print('Only VOC and COCO are supported now!')
         return
-
 
     epoch_size = len(dataset) // args.batch_size
     max_iter = args.max_epoch * epoch_size
@@ -233,6 +244,7 @@ def train():
         # load train data
         images, targets, bms_images = next(batch_iterator)
 
+
         if args.cuda:
             images = Variable(images.cuda())
             targets = [Variable(anno.cuda()) for anno in targets]
@@ -242,6 +254,7 @@ def train():
             images = Variable(images)
             targets = [Variable(anno) for anno in targets]
             bms_images = Variable(bms_images)
+
 
         feed_conv_4_3 = F.interpolate(bms_images, (38, 38))
 
