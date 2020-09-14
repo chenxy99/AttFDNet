@@ -79,20 +79,8 @@ It includes three models
 - Novel model for split 1 for 2 shots scenario named `./weights/task1/novel_2shot_05kd_seed0_2dist_div8_new`
 - Novel model for split 1 for 3 shots scenario named `./weights/task1/novel_3shot_05kd_seed0_2dist_div8_new`
 
-If you run the follow command to evaluate the model for `./weights/task1/novel_2shot_05kd_seed0_2dist_div8_new`
+You can run the follow command to evaluate the model for `./weights/task1/novel_2shot_05kd_seed0_2dist_div8_new`
 
 ```bash
 $ python test_RFB_target.py --trained_model ./weights/task1/novel_2shot_05kd_seed0_2dist_div8_new/Final_RFB_vgg_VOC.pth
 ```
-
-you would likely get the corresponding results
-
-<table>
-  <tr>
-    <th>Novel mAP</th><th>Base mAP</th><th>Overall mAP</th>
-  </tr>
-  <tr>
-    <td>34.9</td><td>65.0</td><td>57.5</td>
-  </tr>
-</table>
-
