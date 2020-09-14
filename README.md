@@ -67,7 +67,7 @@ As an example, for evaluation of the novel classes of split 1, you can directly 
 $ python test_RFB_target.py --trained_model ./weights/task1/novel_2shot_05kd_seed0_2dist_div8_new/Final_RFB_vgg_VOC.pth
 ```
 
-`To evaluate the different dataset, you need to remove the file ''annots.pkl'' in the document './data/VOCdevkit/annotations_cache/'' where you put your dataset.`
+`To evaluate the different dataset, you need to remove the file ''annots.pkl'' in the document ''./data/VOCdevkit/annotations_cache/'' where you put your dataset.`
 
 Pretrained models
 ------------------
