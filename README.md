@@ -38,6 +38,8 @@ As an example, for base stage of training split 1, you can directly use the foll
 $ python train_RFB.py --split split1 --save_folder ./weights/task1/source_300_0712_320embedding_20200227/
 ```
 
+It needs `vgg16_reducedfc.pth` and we include it in the pretrained models [Link](https://drive.google.com/file/d/1teUfobkg3SpHRmL4GFeC5HuiGRqfKqMm/view?usp=sharing).
+
 - Novel stage training
 
 As an example, for novel stage of training split 1, you can directly use the follow command to train the model
@@ -56,8 +58,6 @@ As an example, for evaluation of the base classes of split 1, you can directly u
 ```bash
 $ python test_RFB.py -split split1 --trained_model ./weights/task1/source_300_0712_320embedding_20200227/Final_RFB_vgg_VOC.pth
 ```
-
-It needs `vgg16_reducedfc.pth` and we include it in the pretrained models [Link](https://drive.google.com/file/d/1teUfobkg3SpHRmL4GFeC5HuiGRqfKqMm/view?usp=sharing).
 
 - Novel stage evaluation
 
