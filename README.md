@@ -57,6 +57,8 @@ As an example, for evaluation of the base classes of split 1, you can directly u
 $ python test_RFB.py -split split1 --trained_model ./weights/task1/source_300_0712_320embedding_20200227/Final_RFB_vgg_VOC.pth
 ```
 
+It needs `vgg16_reducedfc.pth` and we include it in the pretrained models [Link](https://drive.google.com/file/d/1teUfobkg3SpHRmL4GFeC5HuiGRqfKqMm/view?usp=sharing).
+
 - Novel stage evaluation
 
 As an example, for evaluation of the novel classes of split 1, you can directly use the follow command to evaluate the model
@@ -70,7 +72,7 @@ $ python test_RFB_target.py --trained_model ./weights/task1/novel_2shot_05kd_see
 Pretrained models
 ------------------
 
-We also provide some of the pretrained model from the [Link](https://drive.google.com/file/d/1bzN5hM-NchcSg1Fppfudotn0dBrv6jL7/view?usp=sharing).
+We also provide some of the pretrained model from the [Link](https://drive.google.com/file/d/1teUfobkg3SpHRmL4GFeC5HuiGRqfKqMm/view?usp=sharing).
 
 It includes three models
 
