@@ -19,7 +19,7 @@ $ conda env create -f RFBNet.yaml
 ```
 to create the same environment where I successfully run my code.
 
- 	4. You also need to execute the following command
+4. You also need to execute the following command
 
 ```bash
 $ sh make.sh
