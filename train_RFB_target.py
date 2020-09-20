@@ -188,7 +188,7 @@ if args.cuda:
 
 # load the target1
 if args.version == 'RFB_vgg':
-    from models.RFB_Net_vgg_target1 import build_net
+    from models.RFB_Net_vgg_target import build_net
 elif args.version == 'RFB_E_vgg':
     from models.RFB_Net_E_vgg import build_net
 elif args.version == 'RFB_mobile':
