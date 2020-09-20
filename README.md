@@ -19,6 +19,14 @@ $ conda env create -f RFBNet.yaml
 ```
 to create the same environment where I successfully run my code.
 
+ 	4. You also need to execute the following command
+
+```bash
+$ sh make.sh
+```
+
+in this repository folder to compile the NMS and other related modules.
+
 Dataset
 ------------------
 
@@ -26,6 +34,7 @@ We provide the spitted VOC dataset in the [Link](https://drive.google.com/file/d
 
 1. You need to manually change the home directory in [code](https://github.com/chenxy99/AttFDNet/blob/master/data/config.py#L6).
 2. You need to manually change the classes of each splits (e.g., split 1, split 2, split 3) in [code](https://github.com/chenxy99/AttFDNet/blob/master/data/voc0712.py#L86) corresponding to the given task as well as the training stages (e.g., base stage or novel stage).
+3. For the training dataset loader, we directly use [BMS](https://github.com/chenxy99/AttFDNet/blob/master/saliency_models/bms.py) in the [VOC dataloader](https://github.com/chenxy99/AttFDNet/blob/master/data/voc0712.py) to get the human saliency prediction.
 
 Start training
 ------------------
